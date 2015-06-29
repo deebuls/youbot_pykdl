@@ -41,10 +41,9 @@ class youbot_kinematics(object):
     """
     Baxter Kinematics with PyKDL
     """
-    def __init__(self, limb):
+    def __init__(self ):
         self._youbot = URDF.from_parameter_server(key='robot_description')
         self._kdl_tree = kdl_tree_from_urdf_model(self._youbot)
-        #self._base_link = self._youbot.get_root()
         self._base_link = 'arm_link_0'
         print "ROOT : ",self._base_link
         self._tip_link = 'arm_link_5'
