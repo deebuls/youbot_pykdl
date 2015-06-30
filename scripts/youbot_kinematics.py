@@ -1,54 +1,43 @@
-#!/usr/bin/python
-
-# Copyright (c) 2013-2014, Rethink Robotics
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice,
-#    this list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-# 3. Neither the name of the Rethink Robotics nor the names of its
-#    contributors may be used to endorse or promote products derived from
-#    this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-
+import sys
+sys.path.append("../src")
 import rospy
-#import sys
-#sys.path.append("../src")
-
+import argparse
 from youbot_pykdl import youbot_kinematics
+import numpy as np
 
 
 def main():
-    rospy.init_node('youbot_kinematics')
+    parser = argparse.ArgumentParser(usage='Load an URDF file')
+    parser.add_argument('file', type=argparse.FileType('r'), nargs='?',
+                        default=None, help='File to load. Use - for stdin')
+    parser.add_argument('-o', '--output', type=argparse.FileType('w'),
+                        default=None, help='Dump file to XML')
+    args = parser.parse_args()
+
     print '*** Youbot PyKDL Kinematics ***\n'
-    kin = youbot_kinematics()
+    if args.file is None:
+        print 'FROM PARAM SERVER'
+        kin = youbot_kinematics()
+    else:
+        print 'FROM STRING'
+        kin = youbot_kinematics(args.file.read())
+
+    rospy.init_node('youbot_kinematics')
+
 
     print '\n*** YouBot Description ***\n'
     kin.print_robot_description()
     print '\n*** YouBot KDL Chain ***\n'
     kin.print_kdl_chain()
     # FK Position
+    joint_pose = [1,1,1,1,1 ]
+
     print '\n*** YouBot Position FK ***\n'
-    print kin.forward_position_kinematics()
+    print kin.forward_position_kinematics(joint_pose)
     # FK Velocity
     print '\n*** YouBot Velocity FK ***\n'
-    print kin.forward_velocity_kinematics()
+    joint_velocities = [0.1,0.5,0.7,0.11,0.1 ]
+    print kin.forward_velocity_kinematics(joint_velocities)
     # IK
     print '\n*** YouBot Position IK ***\n'
     
@@ -56,24 +45,26 @@ def main():
     rot = [-0.004069,    0.18647965, -0.19166656, 0.96357289]
     #pos = [0.582583, -0.180819, 0.216003]
     #rot = [0.03085, 0.9945, 0.0561, 0.0829]
-    print kin.inverse_kinematics(pos)  # position, don't care orientation
+    print kin.inverse_kinematics(pos, seed=joint_pose)  # position, don't care orientation
     print '\n*** YouBot Pose IK ***\n'
-    print kin.inverse_kinematics(pos, rot)  # position & orientation
+    print kin.inverse_kinematics(pos, rot, joint_pose)  # position & orientation
     # Jacobian
     print '\n*** YouBot Jacobian ***\n'
-    print kin.jacobian()
+    print kin.jacobian(joint_pose)
+
+    print np.dot(kin.jacobian(joint_pose) , np.array(joint_velocities))
     # Jacobian Transpose
     print '\n*** YouBot Jacobian Tranpose***\n'
-    print kin.jacobian_transpose()
+    print kin.jacobian_transpose(joint_pose)
     # Jacobian Pseudo-Inverse (Moore-Penrose)
     print '\n*** YouBot Jacobian Pseudo-Inverse (Moore-Penrose)***\n'
-    print kin.jacobian_pseudo_inverse()
+    print kin.jacobian_pseudo_inverse(joint_pose)
     # Joint space mass matrix
     print '\n*** YouBot Joint Inertia ***\n'
-    print kin.inertia()
+    print kin.inertia(joint_pose)
     # Cartesian space mass matrix
     print '\n*** YouBot Cartesian Inertia ***\n'
-    print kin.cart_inertia()
+    print kin.cart_inertia(joint_pose)
 
 if __name__ == "__main__":
     main()

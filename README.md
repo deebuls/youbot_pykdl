@@ -6,7 +6,13 @@ the youbot.
 
 Its based on the baxter python kdl interface provided by Rethink Robotics
 
-** Intializing a ros node 
+* Intializing without a ros node
+```python
+    kin = youbot_kinematics(open('youbot.urdf').read())
+```
+* Intializing a ros node  and reading youbot params from the ros params
+Make sure roscore is running and the youbot parameter are loaded in the
+parameter server
 ```python
 
     rospy.init_node('youbot_kinematics')
@@ -19,7 +25,7 @@ Its based on the baxter python kdl interface provided by Rethink Robotics
     kin.print_kdl_chain()
 ```
 
-** Checking Forward Kinematics
+* Checking Forward Kinematics
 ```python
 
     # FK Position
@@ -31,7 +37,7 @@ Its based on the baxter python kdl interface provided by Rethink Robotics
     # IK
 ```
 
-** Inverse Kinematics
+* Inverse Kinematics
 ```python
 
     # IK
@@ -44,7 +50,7 @@ Its based on the baxter python kdl interface provided by Rethink Robotics
     print kin.inverse_kinematics(pos, rot)  # position & orientation
 ```
 
-** Other Features
+* Other Features
 ```python
 
     # Jacobian

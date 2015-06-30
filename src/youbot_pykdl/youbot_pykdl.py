@@ -39,10 +39,16 @@ from urdf_parser_py.urdf import URDF
 
 class youbot_kinematics(object):
     """
-    Baxter Kinematics with PyKDL
+    Youbot Kinematics with PyKDL
     """
-    def __init__(self ):
-        self._youbot = URDF.from_parameter_server(key='robot_description')
+    def __init__(self ,urdf=None):
+        if urdf is None:
+            print 'FROM PARAM SERVER'
+            self._youbot = URDF.from_parameter_server(key='robot_description')
+        else:
+            print 'FROM STRING'
+            self._youbot = URDF.from_xml_string(urdf)
+
         self._kdl_tree = kdl_tree_from_urdf_model(self._youbot)
         self._base_link = 'arm_link_0'
         print "ROOT : ",self._base_link
@@ -84,8 +90,11 @@ class youbot_kinematics(object):
         for idx in xrange(self._arm_chain.getNrOfSegments()):
             print '* ' + self._arm_chain.getSegment(idx).getName()
 
-    def joints_to_kdl(self, type):
+    def joints_to_kdl(self, type, joints_val=None):
         kdl_array = PyKDL.JntArray(self._num_jnts)
+        print "Not Implemented "
+        print "Interface with the youbot driver not implemented"
+        print "Please provide the Joint values (position, velocity ,efforts) in api"       
 
         '''
         if type == 'positions':
@@ -94,8 +103,6 @@ class youbot_kinematics(object):
             cur_type_values = self._limb_interface.joint_velocities()
         elif type == 'torques':
             cur_type_values = self._limb_interface.joint_efforts()
-        for idx, name in enumerate(self._joint_names):
-            kdl_array[idx] = cur_type_values[name]
         '''
         if type == 'velocities':
             kdl_array = PyKDL.JntArrayVel(kdl_array)
@@ -108,20 +115,37 @@ class youbot_kinematics(object):
                 mat[i,j] = data[i,j]
         return mat
 
-    def forward_position_kinematics(self):
+    def forward_position_kinematics(self, joints_val=None):
         end_frame = PyKDL.Frame()
-        self._fk_p_kdl.JntToCart(self.joints_to_kdl('positions'),
-                                 end_frame)
+        # Populate seed with current angles if not provided
+        seed_array = PyKDL.JntArray(self._num_jnts)
+        if joints_val != None:
+            seed_array.resize(len(joints_val))
+            for idx, jnt in enumerate(joints_val):
+                seed_array[idx] = jnt
+        else:
+            seed_array = self.joints_to_kdl('positions')
+
+        self._fk_p_kdl.JntToCart(seed_array, end_frame)
         pos = end_frame.p
         rot = PyKDL.Rotation(end_frame.M)
         rot = rot.GetQuaternion()
         return np.array([pos[0], pos[1], pos[2],
                          rot[0], rot[1], rot[2], rot[3]])
 
-    def forward_velocity_kinematics(self):
+    def forward_velocity_kinematics(self, joints_val=None):
         end_frame = PyKDL.FrameVel()
-        self._fk_v_kdl.JntToCart(self.joints_to_kdl('velocities'),
-                                 end_frame)
+        # Populate seed with current angles if not provided
+        seed_array = PyKDL.JntArray(self._num_jnts)
+        if joints_val != None:
+            seed_array.resize(len(joints_val))
+            for idx, jnt in enumerate(joints_val):
+                seed_array[idx] = jnt
+            seed_array = PyKDL.JntArrayVel(seed_array)
+        else:
+            seed_array = self.joints_to_kdl('velocities')
+
+        self._fk_v_kdl.JntToCart(seed_array, end_frame)
         return end_frame.GetTwist()
 
     def inverse_kinematics(self, position, orientation=None, seed=None):
@@ -154,24 +178,42 @@ class youbot_kinematics(object):
             print 'No IK Solution Found'
             return None
 
-    def jacobian(self):
+    def jacobian(self, seed=None):
         jacobian = PyKDL.Jacobian(self._num_jnts)
-        self._jac_kdl.JntToJac(self.joints_to_kdl('positions'), jacobian)
+        # Populate seed with current angles if not provided
+        seed_array = PyKDL.JntArray(self._num_jnts)
+        if seed != None:
+            seed_array.resize(len(seed))
+            for idx, jnt in enumerate(seed):
+                seed_array[idx] = jnt
+        else:
+            seed_array = self.joints_to_kdl('positions')
+
+        self._jac_kdl.JntToJac(seed_array, jacobian)
         return self.kdl_to_mat(jacobian)
 
-    def jacobian_transpose(self):
-        return self.jacobian().T
+    def jacobian_transpose(self, seed=None):
+        return self.jacobian(seed).T
 
-    def jacobian_pseudo_inverse(self):
-        return np.linalg.pinv(self.jacobian())
+    def jacobian_pseudo_inverse(self, seed=None):
+        return np.linalg.pinv(self.jacobian(seed))
 
 
-    def inertia(self):
+    def inertia(self, seed=None):
         inertia = PyKDL.JntSpaceInertiaMatrix(self._num_jnts)
-        self._dyn_kdl.JntToMass(self.joints_to_kdl('positions'), inertia)
+        # Populate seed with current angles if not provided
+        seed_array = PyKDL.JntArray(self._num_jnts)
+        if seed != None:
+            seed_array.resize(len(seed))
+            for idx, jnt in enumerate(seed):
+                seed_array[idx] = jnt
+        else:
+            seed_array = self.joints_to_kdl('positions')
+
+        self._dyn_kdl.JntToMass(seed_array, inertia)
         return self.kdl_to_mat(inertia)
 
-    def cart_inertia(self):
-        js_inertia = self.inertia()
-        jacobian = self.jacobian()
+    def cart_inertia(self, seed=None):
+        js_inertia = self.inertia(seed)
+        jacobian = self.jacobian(seed)
         return np.linalg.inv(jacobian * np.linalg.inv(js_inertia) * jacobian.T)
